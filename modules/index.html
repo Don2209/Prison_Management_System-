@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Prison Management System - Module Hub</title>
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/style.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/responsive.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/glassmorphism.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            padding: 3rem 2rem;
+        }
+        
+        .module-card {
+            background: var(--glass-light);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: var(--transition);
+            animation: slideIn 0.5s ease-out;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .module-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+        
+        .module-card:hover::before {
+            left: 100%;
+        }
+        
+        .module-card:hover {
+            transform: translateY(-8px);
+            background: var(--glass-lighter);
+            box-shadow: 0 12px 48px rgba(99, 102, 241, 0.3);
+        }
+        
+        .module-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: float 3s ease-in-out infinite;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .module-icon i {
+            font-size: 3rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .module-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .module-description {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .module-features {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .module-features li {
+            padding: 0.5rem 0;
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .module-features li::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .module-link {
+            display: inline-block;
+            background: var(--gradient-primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        
+        .module-link:hover {
+            transform: translateX(4px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+        }
+        
+        .hub-header {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: white;
+        }
+        
+        .hub-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            animation: slideIn 0.6s ease-out;
+        }
+        
+        .hub-subtitle {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 3rem;
+            animation: slideIn 0.7s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="hub-header">
+        <h1 class="hub-title">🏢 Prison Management System</h1>
+        <p class="hub-subtitle">Advanced Multi-Module System with Glassmorphism Design</p>
+    </div>
+
+    <div class="modules-grid">
+        <!-- Inmates Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="module-title">Inmates Management</div>
+            <div class="module-description">Complete inmate lifecycle management with admission, transfers, and releases</div>
+            <ul class="module-features">
+                <li>Inmate admission & records</li>
+                <li>Cell assignments</li>
+                <li>Transfer tracking</li>
+                <li>Risk classification</li>
+            </ul>
+            <a href="/modules/inmates/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Staff Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-briefcase"></i></div>
+            <div class="module-title">Staff Management</div>
+            <div class="module-description">Manage staff members, roles, departments, and duty schedules</div>
+            <ul class="module-features">
+                <li>Staff profiles</li>
+                <li>Department tracking</li>
+                <li>Shift scheduling</li>
+                <li>Role assignment</li>
+            </ul>
+            <a href="/modules/staff/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Facilities Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-buildings"></i></div>
+            <div class="module-title">Facilities</div>
+            <div class="module-description">Multi-facility management for national-level oversight (Super Admin)</div>
+            <ul class="module-features">
+                <li>Facility details</li>
+                <li>Capacity tracking</li>
+                <li>Occupancy monitoring</li>
+                <li>Statistics</li>
+            </ul>
+            <a href="/modules/facilities/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Inventory Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-box-seam"></i></div>
+            <div class="module-title">Inventory Management</div>
+            <div class="module-description">Advanced inventory with warehouses, suppliers, and purchase orders</div>
+            <ul class="module-features">
+                <li>Item tracking</li>
+                <li>Warehouse management</li>
+                <li>Low stock alerts</li>
+                <li>Supplier integration</li>
+            </ul>
+            <a href="/modules/inventory/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Finance Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-wallet2"></i></div>
+            <div class="module-title">Finance</div>
+            <div class="module-description">Manage inmate accounts and financial transactions</div>
+            <ul class="module-features">
+                <li>Account management</li>
+                <li>Deposits & withdrawals</li>
+                <li>Transaction history</li>
+                <li>Account statements</li>
+            </ul>
+            <a href="/modules/finance/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Incidents Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="module-title">Incidents</div>
+            <div class="module-description">Report and investigate security incidents and events</div>
+            <ul class="module-features">
+                <li>Incident reporting</li>
+                <li>Investigation tracking</li>
+                <li>Severity classification</li>
+                <li>Resolution history</li>
+            </ul>
+            <a href="/modules/incidents/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Medical Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-hospital"></i></div>
+            <div class="module-title">Medical Records</div>
+            <div class="module-description">Maintain comprehensive medical records and medication history</div>
+            <ul class="module-features">
+                <li>Medical records</li>
+                <li>Medication tracking</li>
+                <li>Vital signs</li>
+                <li>Follow-up scheduling</li>
+            </ul>
+            <a href="/modules/medical/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Visits Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-person-lines-fill"></i></div>
+            <div class="module-title">Visitor Management</div>
+            <div class="module-description">Manage visitor requests, approvals, and visit schedules</div>
+            <ul class="module-features">
+                <li>Visit requests</li>
+                <li>Approval workflow</li>
+                <li>Visitor tracking</li>
+                <li>Schedule management</li>
+            </ul>
+            <a href="/modules/visits/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Programs Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-book"></i></div>
+            <div class="module-title">Rehabilitation Programs</div>
+            <div class="module-description">Track rehabilitation programs and inmate enrollment</div>
+            <ul class="module-features">
+                <li>Program management</li>
+                <li>Enrollment tracking</li>
+                <li>Progress monitoring</li>
+                <li>Completion records</li>
+            </ul>
+            <a href="/modules/programs/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- Reports Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-graph-up"></i></div>
+            <div class="module-title">Reports & Analytics</div>
+            <div class="module-description">Generate comprehensive reports and analytics dashboards</div>
+            <ul class="module-features">
+                <li>Statistics dashboards</li>
+                <li>Custom reports</li>
+                <li>Data exports</li>
+                <li>Audit logs</li>
+            </ul>
+            <a href="/modules/reports/index.php" class="module-link">→ Open Module</a>
+        </div>
+
+        <!-- User Profile Module -->
+        <div class="module-card">
+            <div class="module-icon"><i class="bi bi-shield-lock"></i></div>
+            <div class="module-title">User Account</div>
+            <div class="module-description">Manage your user profile and security settings</div>
+            <ul class="module-features">
+                <li>Profile information</li>
+                <li>Change password</li>
+                <li>Security settings</li>
+                <li>Account activity</li>
+            </ul>
+            <a href="/modules/auth/profile.php" class="module-link">→ Open Profile</a>
+        </div>
+    </div>
+
+    <script src="<?php echo APP_URL; ?>/assets/js/main.js"></script>
+</body>
+</html>
