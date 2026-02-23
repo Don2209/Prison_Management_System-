@@ -10,10 +10,30 @@ require_once dirname(__FILE__) . '/includes/functions.php';
 requireAuth();
 $pageTitle   = 'Dashboard';
 $currentUser = getCurrentUser();
-$fid         = getCurrentFacility();
-$facility    = getFacility($fid);
-$stats       = getFacilityStatistics($fid);
-$occupancy   = getFacilityOccupancy($fid);
+
+/* ── Facility scope: super admin can filter by a specific facility ── */
+$isSA = isSuperAdmin();
+
+// For super admins: honour ?fid= filter; default null = all facilities
+$fidFilter = null;
+if ($isSA && isset($_GET['fid']) && (int)$_GET['fid'] > 0) {
+    $fidFilter = (int)$_GET['fid'];
+}
+
+// The "working" facility id used for single-facility functions
+$fid = $isSA ? ($fidFilter ?? null) : getCurrentFacility();
+
+$allFacilities = $isSA ? getAccessibleFacilities() : [];
+$facility      = $fid ? getFacility($fid) : null;
+
+// Stats & occupancy – system-wide for SA (unless filtering on one facility)
+if ($isSA && !$fidFilter) {
+    $stats    = getSystemStatistics();
+    $occupancy = getSystemOccupancy();
+} else {
+    $stats    = getFacilityStatistics($fid);
+    $occupancy = getFacilityOccupancy($fid);
+}
 
 /* ── Chart: Inmate admissions – last 12 months ── */
 $inmateMonths  = [];
@@ -21,7 +41,7 @@ $inmateCounts  = [];
 for ($i = 11; $i >= 0; $i--) {
     $dt = new DateTime("first day of -$i months");
     $inmateMonths[] = $dt->format('M Y');
-    $facilityFilter = isSuperAdmin() ? '' : 'AND facility_id = ' . (int)$fid;
+    $facilityFilter = ($isSA && !$fidFilter) ? '' : 'AND facility_id = ' . (int)$fid;
     $row = fetchOne(
         "SELECT COUNT(*) as cnt FROM inmates
          WHERE YEAR(admission_date)=? AND MONTH(admission_date)=? $facilityFilter AND deleted_at IS NULL",
@@ -39,7 +59,7 @@ for ($i = 5; $i >= 0; $i--) {
     $incidentMonths[] = $dt->format('M Y');
     $y = (int)$dt->format('Y');
     $m = (int)$dt->format('m');
-    $ff = isSuperAdmin() ? '' : 'AND facility_id = ' . (int)$fid;
+    $ff = ($isSA && !$fidFilter) ? '' : 'AND facility_id = ' . (int)$fid;
     foreach (['LOW'=>&$incLow,'MEDIUM'=>&$incMed,'HIGH'=>&$incHigh,'CRITICAL'=>&$incCrit] as $sev => &$arr) {
         $r = fetchOne(
             "SELECT COUNT(*) as cnt FROM incidents
@@ -52,7 +72,7 @@ for ($i = 5; $i >= 0; $i--) {
 }
 
 /* ── Chart: Inmate status breakdown ── */
-$statusFilter = isSuperAdmin()
+$statusFilter = ($isSA && !$fidFilter)
     ? "deleted_at IS NULL"
     : "facility_id=$fid AND deleted_at IS NULL";
 $statusRows = fetchAll("SELECT status, COUNT(*) as cnt FROM inmates WHERE $statusFilter GROUP BY status");
@@ -60,7 +80,7 @@ $statusLabels = array_column($statusRows, 'status');
 $statusData   = array_map('intval', array_column($statusRows, 'cnt'));
 
 /* ── Chart: Incident severity totals ── */
-$sevFilter = isSuperAdmin()
+$sevFilter = ($isSA && !$fidFilter)
     ? "deleted_at IS NULL"
     : "facility_id=$fid AND deleted_at IS NULL";
 $sevRows    = fetchAll("SELECT severity, COUNT(*) as cnt FROM incidents WHERE $sevFilter GROUP BY severity");
@@ -68,8 +88,13 @@ $sevLabels  = array_column($sevRows, 'severity');
 $sevData    = array_map('intval', array_column($sevRows, 'cnt'));
 
 /* ── Recent data ── */
-$recentComplaints = getPendingComplaints($fid, 5);
-$recentIncidents  = getFacilityIncidents($fid, null, 5);
+if ($isSA && !$fidFilter) {
+    $recentComplaints = getAllPendingComplaints(5);
+    $recentIncidents  = getAllRecentIncidents(5);
+} else {
+    $recentComplaints = getPendingComplaints($fid, 5);
+    $recentIncidents  = getFacilityIncidents($fid, null, 5);
+}
 ?>
 <?php require_once 'includes/header.php'; ?>
 
@@ -232,11 +257,31 @@ body { background: var(--bs-body-bg); }
       Overview <span class="gradient-text">Analytics</span>
     </h4>
     <p class="mb-0" style="font-size:.83rem; color:#8b949e;">
-      <i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($facility['name'] ?? 'All Facilities'); ?>
+      <?php if ($isSA && !$fidFilter): ?>
+      <i class="bi bi-globe2 me-1"></i>All Facilities — System-Wide View
+      <?php else: ?>
+      <i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($facility['name'] ?? 'Facility'); ?>
+      <?php endif; ?>
       &nbsp;·&nbsp;<?php echo date('l, F j, Y'); ?>
     </p>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+
+    <?php if ($isSA): ?>
+    <!-- ── Facility selector (super admin only) ── -->
+    <form method="GET" action="" class="d-flex align-items-center gap-2 m-0">
+      <select name="fid" onchange="this.form.submit()"
+        style="background:#161b22;border:1px solid #30363d;color:#e6edf3;border-radius:8px;padding:6px 10px;font-size:.82rem;cursor:pointer;">
+        <option value="">🌐 All Facilities</option>
+        <?php foreach ($allFacilities as $af): ?>
+        <option value="<?php echo $af['id']; ?>" <?php echo $fidFilter == $af['id'] ? 'selected' : ''; ?>>
+          🏢 <?php echo htmlspecialchars($af['name']); ?>
+        </option>
+        <?php endforeach; ?>
+      </select>
+    </form>
+    <?php endif; ?>
+
     <?php if (hasPermission('create', 'inmates')): ?>
     <a href="<?php echo APP_URL; ?>/modules/inmates/add.php"
        class="btn btn-sm btn-primary d-flex align-items-center gap-1" style="border-radius:8px;">
@@ -313,6 +358,29 @@ body { background: var(--bs-body-bg); }
       'sub'    => 'Requires attention',
     ],
   ];
+
+  // Extra cards for Super Admin system-wide view
+  if ($isSA && !$fidFilter) {
+      $kpis[] = [
+        'label'  => 'Total Facilities',
+        'value'  => number_format($stats['total_facilities'] ?? 0),
+        'icon'   => 'bi-building',
+        'bg'     => 'rgba(26,188,156,.15)',
+        'color'  => '#1abc9c',
+        'stripe' => 'linear-gradient(90deg,#148f77,#1abc9c)',
+        'sub'    => 'Active prison facilities',
+      ];
+      $kpis[] = [
+        'label'  => 'System Users',
+        'value'  => number_format($stats['total_users'] ?? 0),
+        'icon'   => 'bi-person-check-fill',
+        'bg'     => 'rgba(142,68,173,.15)',
+        'color'  => '#8e44ad',
+        'stripe' => 'linear-gradient(90deg,#6c3483,#8e44ad)',
+        'sub'    => 'Active user accounts',
+      ];
+  }
+
   foreach ($kpis as $k): ?>
   <div class="col-6 col-xl-4 col-xxl-2">
     <div class="kpi-card h-100" style="--kpi-stripe:<?php echo $k['stripe']; ?>">
@@ -326,6 +394,89 @@ body { background: var(--bs-body-bg); }
   </div>
   <?php endforeach; ?>
 </div>
+
+<?php if ($isSA && !$fidFilter && !empty($occupancy['facilities'])): ?>
+<!-- ════════════ SUPER ADMIN: PER-FACILITY OVERVIEW ════════════ -->
+<div class="mb-4">
+  <div class="chart-card">
+    <div class="cc-header">
+      <div>
+        <p class="cc-title"><i class="bi bi-building-check me-2" style="color:#1abc9c;"></i>Facility Overview</p>
+        <p class="cc-sub">Real-time status across all <?php echo count($occupancy['facilities']); ?> facilities</p>
+      </div>
+      <a href="<?php echo APP_URL; ?>/modules/facilities/index.php"
+         class="btn btn-sm btn-outline-secondary" style="font-size:.75rem; border-radius:8px;">
+        Manage Facilities
+      </a>
+    </div>
+    <div class="table-responsive">
+      <table class="table tbl-dark-custom mb-0">
+        <thead>
+          <tr>
+            <th>Facility</th>
+            <th>Location</th>
+            <th>Population</th>
+            <th style="min-width:160px;">Occupancy</th>
+            <th>Inmates</th>
+            <th>Staff</th>
+            <th>Incidents</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($occupancy['facilities'] as $frow):
+            $pct    = $frow['occupancy_pct'];
+            $barClr = $frow['is_overcrowded'] ? '#e74c3c' : ($pct > 80 ? '#f39c12' : '#2ecc71');
+            // per-facility quick stats
+            $fs = getFacilityStatistics($frow['id']);
+          ?>
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="avatar-sm" style="background:#1f6feb12;color:#388bfd;font-size:.7rem;">
+                  <i class="bi bi-building"></i>
+                </div>
+                <strong style="font-size:.85rem;"><?php echo htmlspecialchars($frow['name']); ?></strong>
+              </div>
+            </td>
+            <td style="color:#8b949e;font-size:.82rem;"><?php echo htmlspecialchars($frow['location'] ?? '—'); ?></td>
+            <td style="font-size:.82rem;">
+              <span style="color:#e6edf3;font-weight:600;"><?php echo $frow['current_population']; ?></span>
+              <span style="color:#8b949e;"> / <?php echo $frow['total_capacity']; ?></span>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="occ-bar flex-grow-1" style="height:8px;">
+                  <div class="occ-bar-fill" style="width:<?php echo min($pct,100); ?>%;background:<?php echo $barClr; ?>;"></div>
+                </div>
+                <span style="font-size:.75rem;color:<?php echo $barClr; ?>;font-weight:600;white-space:nowrap;">
+                  <?php echo $pct; ?>%
+                  <?php if ($frow['is_overcrowded']): ?><i class="bi bi-exclamation-triangle-fill ms-1"></i><?php endif; ?>
+                </span>
+              </div>
+            </td>
+            <td style="font-size:.82rem;color:#e6edf3;"><?php echo number_format($fs['total_inmates'] ?? 0); ?></td>
+            <td style="font-size:.82rem;color:#e6edf3;"><?php echo number_format($fs['total_staff'] ?? 0); ?></td>
+            <td style="font-size:.82rem;">
+              <?php $inc = $fs['incidents_month'] ?? 0; ?>
+              <span style="color:<?php echo $inc > 0 ? '#e74c3c' : '#2ecc71'; ?>;">
+                <?php echo $inc > 0 ? $inc : '<i class="bi bi-check-circle-fill"></i>'; ?>
+              </span>
+            </td>
+            <td>
+              <a href="?fid=<?php echo $frow['id']; ?>"
+                 class="btn btn-sm" style="font-size:.72rem;border-radius:6px;background:#21262d;color:#e6edf3;border:1px solid #30363d;padding:3px 10px;">
+                View
+              </a>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- ════════════ ROW: Inmate Growth + Occupancy ════════════ -->
 <div class="row g-3 mb-4">
@@ -351,7 +502,9 @@ body { background: var(--bs-body-bg); }
     <div class="chart-card h-100">
       <div class="cc-header">
         <div>
-          <p class="cc-title"><i class="bi bi-building me-2" style="color:#9b59b6;"></i>Facility Occupancy</p>
+          <p class="cc-title"><i class="bi bi-building me-2" style="color:#9b59b6;"></i>
+            <?php echo ($isSA && !$fidFilter) ? 'System Occupancy' : 'Facility Occupancy'; ?>
+          </p>
           <p class="cc-sub"><?php echo $occupancy['current'] ?? 0; ?> / <?php echo $occupancy['capacity'] ?? 0; ?> inmates</p>
         </div>
       </div>
@@ -518,7 +671,11 @@ body { background: var(--bs-body-bg); }
       <?php else: ?>
       <div class="table-responsive">
       <table class="table tbl-dark-custom mb-0">
-        <thead><tr><th>Inmate</th><th>Type</th><th>Status</th><th>Date</th></tr></thead>
+        <thead><tr>
+          <th>Inmate</th>
+          <?php if ($isSA && !$fidFilter): ?><th>Facility</th><?php endif; ?>
+          <th>Type</th><th>Status</th><th>Date</th>
+        </tr></thead>
         <tbody>
           <?php foreach ($recentComplaints as $c): ?>
           <tr>
@@ -528,6 +685,9 @@ body { background: var(--bs-body-bg); }
                 <span><?php echo htmlspecialchars($c['first_name'].' '.$c['last_name']); ?></span>
               </div>
             </td>
+            <?php if ($isSA && !$fidFilter): ?>
+            <td style="font-size:.78rem;color:#8b949e;"><?php echo htmlspecialchars($c['facility_name'] ?? '—'); ?></td>
+            <?php endif; ?>
             <td><?php echo htmlspecialchars($c['complaint_type']); ?></td>
             <td><span class="chip chip-pending"><?php echo $c['status']; ?></span></td>
             <td style="color:#8b949e;"><?php echo formatDate($c['submission_date'], 'M d'); ?></td>
@@ -559,7 +719,11 @@ body { background: var(--bs-body-bg); }
       <?php else: ?>
       <div class="table-responsive">
       <table class="table tbl-dark-custom mb-0">
-        <thead><tr><th>Category</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead>
+        <thead><tr>
+          <th>Category</th>
+          <?php if ($isSA && !$fidFilter): ?><th>Facility</th><?php endif; ?>
+          <th>Severity</th><th>Status</th><th>Date</th>
+        </tr></thead>
         <tbody>
           <?php foreach ($recentIncidents as $inc):
             $sevMap = ['LOW'=>'chip-low','MEDIUM'=>'chip-medium','HIGH'=>'chip-high','CRITICAL'=>'chip-critical'];
@@ -570,6 +734,9 @@ body { background: var(--bs-body-bg); }
           ?>
           <tr>
             <td><?php echo htmlspecialchars($inc['category_name']); ?></td>
+            <?php if ($isSA && !$fidFilter): ?>
+            <td style="font-size:.78rem;color:#8b949e;"><?php echo htmlspecialchars($inc['facility_name'] ?? '—'); ?></td>
+            <?php endif; ?>
             <td><span class="chip <?php echo $sevCls; ?>"><?php echo $inc['severity']; ?></span></td>
             <td><span class="chip <?php echo $staCls; ?>"><?php echo $staLbl; ?></span></td>
             <td style="color:#8b949e;"><?php echo formatDate($inc['incident_date'], 'M d'); ?></td>

@@ -9,7 +9,8 @@
 // ===================================================================
 ini_set('session.gc_maxlifetime', 86400); // 24 hours
 ini_set('session.cookie_lifetime', 86400);
-ini_set('session.cookie_secure', false); // Set to true in production with HTTPS
+$__isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443);
+ini_set('session.cookie_secure', $__isHttps ? '1' : '0');
 ini_set('session.cookie_httponly', true);
 
 // ===================================================================
@@ -26,8 +27,16 @@ define('APP_NAME', 'Advanced Multi-Prison Management System');
 define('APP_VERSION', '1.0.0');
 define('APP_ENVIRONMENT', 'production'); // 'development', 'staging', 'production'
 define('APP_ROOT', dirname(dirname(__FILE__)));
-define('APP_URL', 'http://localhost/PMS');
-define('API_URL', 'http://localhost/PMS/api');
+$__protocol = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443)) ? 'https' : 'http';
+$__host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$__docRoot  = realpath($_SERVER['DOCUMENT_ROOT'] ?? getcwd());
+$__appRoot  = realpath(dirname(__DIR__));
+$__appPath  = ($__docRoot && strpos($__appRoot, $__docRoot) === 0)
+    ? str_replace('\\', '/', substr($__appRoot, strlen($__docRoot)))
+    : '/PMS';
+define('APP_URL', $__protocol . '://' . $__host . $__appPath);
+define('API_URL', APP_URL . '/api');
+unset($__protocol, $__host, $__docRoot, $__appRoot, $__appPath, $__isHttps);
 
 // ===================================================================
 // TIMEZONE

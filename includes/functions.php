@@ -743,3 +743,127 @@ function buildWhereClause($conditions) {
     }
     return implode(' AND ', $where);
 }
+
+// ===================================================================
+// SUPER-ADMIN: SYSTEM-WIDE AGGREGATE HELPERS
+// ===================================================================
+
+/**
+ * Get system-wide statistics (all facilities).
+ * Used by Super Admin dashboard.
+ */
+function getSystemStatistics() {
+    try {
+        $stats = [];
+
+        $r = fetchOne("SELECT COUNT(*) as c FROM inmates WHERE status IN ('REMAND','CONVICTED') AND deleted_at IS NULL");
+        $stats['total_inmates'] = (int)($r['c'] ?? 0);
+
+        $r = fetchOne("SELECT COUNT(*) as c FROM staff WHERE employment_status='ACTIVE' AND deleted_at IS NULL");
+        $stats['total_staff'] = (int)($r['c'] ?? 0);
+
+        $r = fetchOne("SELECT COUNT(*) as c FROM incidents WHERE MONTH(incident_date)=MONTH(NOW()) AND YEAR(incident_date)=YEAR(NOW()) AND deleted_at IS NULL");
+        $stats['incidents_month'] = (int)($r['c'] ?? 0);
+
+        $r = fetchOne("SELECT COUNT(*) as c FROM inmate_transfers WHERE approval_status='PENDING' AND deleted_at IS NULL");
+        $stats['pending_transfers'] = (int)($r['c'] ?? 0);
+
+        $r = fetchOne("SELECT COUNT(*) as c FROM facilities WHERE deleted_at IS NULL");
+        $stats['total_facilities'] = (int)($r['c'] ?? 0);
+
+        $r = fetchOne("SELECT COUNT(*) as c FROM users WHERE is_active=1 AND deleted_at IS NULL");
+        $stats['total_users'] = (int)($r['c'] ?? 0);
+
+        return $stats;
+    } catch (Exception $e) {
+        logError('Get System Statistics', $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Get system-wide occupancy totals + per-facility breakdown.
+ * Returns ['current', 'capacity', 'percentage', 'is_overcrowded', 'facilities' => [...]]
+ */
+function getSystemOccupancy() {
+    try {
+        $facilities = fetchAll(
+            "SELECT f.id, f.name, f.location, f.total_capacity,
+                    COUNT(i.id) as current_population
+             FROM facilities f
+             LEFT JOIN inmates i ON i.facility_id = f.id
+                 AND i.status IN ('REMAND','CONVICTED') AND i.deleted_at IS NULL
+             WHERE f.deleted_at IS NULL
+             GROUP BY f.id
+             ORDER BY f.name"
+        );
+
+        $totalCurrent  = 0;
+        $totalCapacity = 0;
+        foreach ($facilities as &$fac) {
+            $fac['current_population'] = (int)$fac['current_population'];
+            $fac['total_capacity']     = (int)($fac['total_capacity'] ?? 0);
+            $fac['occupancy_pct']      = $fac['total_capacity'] > 0
+                ? round(($fac['current_population'] / $fac['total_capacity']) * 100, 1)
+                : 0;
+            $fac['is_overcrowded']     = $fac['current_population'] > $fac['total_capacity'];
+            $totalCurrent  += $fac['current_population'];
+            $totalCapacity += $fac['total_capacity'];
+        }
+        unset($fac);
+
+        return [
+            'current'       => $totalCurrent,
+            'capacity'      => $totalCapacity,
+            'percentage'    => $totalCapacity > 0 ? round(($totalCurrent / $totalCapacity) * 100, 1) : 0,
+            'is_overcrowded'=> $totalCurrent > $totalCapacity,
+            'facilities'    => $facilities,
+        ];
+    } catch (Exception $e) {
+        logError('Get System Occupancy', $e->getMessage());
+        return ['current'=>0,'capacity'=>0,'percentage'=>0,'is_overcrowded'=>false,'facilities'=>[]];
+    }
+}
+
+/**
+ * Get all pending complaints across all facilities (Super Admin).
+ */
+function getAllPendingComplaints($limit = 20) {
+    try {
+        return fetchAll(
+            "SELECT c.*, i.first_name, i.last_name, i.inmate_id, f.name as facility_name
+             FROM complaints c
+             JOIN inmates i  ON c.inmate_id   = i.id
+             JOIN facilities f ON c.facility_id = f.id
+             WHERE c.status IN ('SUBMITTED','UNDER_REVIEW') AND c.deleted_at IS NULL
+             ORDER BY c.submission_date DESC LIMIT ?",
+            [$limit], 'i'
+        );
+    } catch (Exception $e) {
+        logError('Get All Pending Complaints', $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Get all recent incidents across all facilities (Super Admin).
+ */
+function getAllRecentIncidents($limit = 20) {
+    try {
+        return fetchAll(
+            "SELECT i.*, ic.name as category_name,
+                    u.first_name, u.last_name,
+                    f.name as facility_name
+             FROM incidents i
+             JOIN incident_categories ic ON i.incident_category_id = ic.id
+             JOIN users u       ON i.reported_by  = u.id
+             JOIN facilities f  ON i.facility_id  = f.id
+             WHERE i.deleted_at IS NULL
+             ORDER BY i.incident_date DESC LIMIT ?",
+            [$limit], 'i'
+        );
+    } catch (Exception $e) {
+        logError('Get All Recent Incidents', $e->getMessage());
+        return [];
+    }
+}
